@@ -12,27 +12,29 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+
+
 @st.cache_resource
 def load_models(model_path):
     """
     loading the models
     caching ensures models are only loaded  once.
     """
-    if os.path.exists(model_path):
-        return joblib.load(model_path)
-    else:
-        st.error(f"Model file not found: {model_path}")
-        return None
+    models = {}
+    for key, model in model_path.items():
+        models[key] = joblib.load(model)
+    return models
 
 # model paths
 MODEL_PATHS = {
-    'شقة للبيع': os.path.join(os.path.dirname(__file__), "..", "models","gbr_apartment_sale_model(1).joblib"),
-    'شقة للإيجار': os.path.join(os.path.dirname(__file__), "..","models","gbr_apartment_rent_model(1).joblib"),
-    'فيلا للبيع':  os.path.join(os.path.dirname(__file__), "..","models","rfr_villa_sale_model.pkl"),
-    'فيلا للإيجار': os.path.join(os.path.dirname(__file__), "..","models","rfr_villa_rent_model.pkl")
+    'apartment_sale': os.path.join(os.path.dirname(__file__), "..", "models","gbr_apartment_sale_model(1).joblib"),
+    'apartment_rent': os.path.join(os.path.dirname(__file__), "..","models","gbr_apartment_rent_model(1).joblib"),
+    'villa_sale':  os.path.join(os.path.dirname(__file__), "..","models","rfr_villa_sale_model.pkl"),
+    'villa_rent': os.path.join(os.path.dirname(__file__), "..","models","rfr_villa_rent_model.pkl")
 }
+loaded_models = load_models(MODEL_PATHS)
 
-property_types = {
+property_mapping = {
     'شقة للبيع': 'apartment_sale',
     'شقة للإيجار': 'apartment_rent',
     'فيلا للبيع': 'villa_sale',
@@ -44,13 +46,9 @@ st.sidebar.header("أدخل تفاصيل العقار")
 
 property_type = st.sidebar.selectbox(
     'نوع العقار',
-    list(MODEL_PATHS.keys())
+    list(property_mapping.keys())
 )
 
-# load the selected model
-model = load_model(MODEL_PATHS[property_type])
-
-loaded_models = {}
 
 DISTRICTS_PATH = os.path.join(os.path.dirname(__file__), "..", "data","district_mapping.csv")
 def get_district_id(district_name: str) -> int:
@@ -138,54 +136,59 @@ with col2:
     st.markdown(f"**خطوط العرض:** {input_data['latitude']}")
 
 # function to make prediction
-def predict_price(input_data, model):
+def predict_price(input_data) -> list:
     data = pd.DataFrame([input_data])
+
+    type = property_mapping[property_type]
+
     
-    # if model:
-    #     prediction = model.predict(input_df)
-    #     return prediction[0]
-    # else:
-    #     return None
-    type = property_types[property_type]
     if type == 'apartment_sale':
-        rent_pred = model["apartment_rent"].predict(data)
-        sale_pred = model["apartment_sale"].predict(data)
+
+        rent_pred = loaded_models["apartment_rent"].predict(data)
+        sale_pred = loaded_models["apartment_sale"].predict(data)
         rent_yield = (rent_pred[0] / sale_pred[0]) * 100
-        return {f"السعر المتوقع للبيع {sale_pred[0]:,.2f}", 
-                f"السعر المتوقع للإيجار{rent_pred[0]:,.2f}",
-                f"العائد السنوي المتوقع للإيجار السنوي {rent_yield:.2f}%"
-            }
+        
+        results = [
+        [f"السعر المتوقع لبيع الشقة: ***{sale_pred[0]:,.2f}*** ريال"],
+        [f"العائد السنوي المتوقع من الشقة٪ ***{rent_yield:.2f}***"]
+        ]
+
+        return results
     
     elif type == 'apartment_rent':
-        rent_pred = model["apartment_rent"].predict(data)
-        sale_pred = model["apartment_sale"].predict(data)
-        return {"Predicted Sale Price": f"{sale_pred[0]:,.2f}", 
-                "Predicted Rental Price": f"{rent_pred[0]:,.2f}"
-            }
+        rent_pred = loaded_models["apartment_rent"].predict(data)
+        results = [
+             [f"السعر المتوقع للإيجار الشقة: ***{rent_pred[0]:,.2f}*** ريال"]
+        ]
+        return results
     
     elif type == 'villa_rent':
-        rent_pred = model["villa_rent"].predict(data)
-        return {"Predicted Rental Price": f"{rent_pred[0]:,.2f}"}
+        rent_pred = loaded_models["villa_rent"].predict(data)
+        results = [
+            [f" السعر المتوقع للإيجار الفيلا ***{rent_pred[0]:,.2f}*** ريال"]
+            ]
+        return results
     
     elif type == 'villa_sale':
-        sale_pred = model["villa_sale"].predict(data)
-        return {"Predicted Sale Price": f"{sale_pred[0]:,.2f}"}
-    
+        sale_pred = loaded_models["villa_sale"].predict(data)
+        results = [
+            [f"السعر المتوقع لبيع الفيلا: ***{sale_pred[0]:,.2f}*** ريال"]
+            ]
+        return results
+   
     else:
-        return {"message": "Invalid Property Type"}
+        return None
     
 
 # predict btton
 if st.button("🔮 توقع السعر"):
-    if model:
-        with st.spinner("جاري التنبؤ..."):
-            price = predict_price(input_data, model)
-        if price is not None:
-            st.success(f" **السعر المتوقع للعقار {price:,.2f}** ريال سعودي")
-        else:
-            st.error("لم يتم التنبؤ. يرجى التحقق من النموذج.")
+    with st.spinner("جاري التنبؤ..."):
+        results = predict_price(input_data)
+    if results is not None:
+        for result in results:
+            st.success(result[0])
     else:
-        st.error("لم يتم تحميل النموذج. يرجى التحقق من مسار النموذج.")
+        st.error("الرجاء التأكد من تفاصيل العقار المُدخلة")
 
 
 st.markdown("---")
