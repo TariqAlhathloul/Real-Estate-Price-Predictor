@@ -1,0 +1,11 @@
+psycopg2-binary==2.9.10
+sqlalchemy==2.0.36
+pandas==2.2.3
+ipykernel==6.29.5
+joblib==1.4.2
+scikit-learn==1.5.1
+fastapi==0.115.6
+fastapi[standard]
+uvicorn==0.34.0
+streamlit==1.41.1
+xgboost==2.1.3
