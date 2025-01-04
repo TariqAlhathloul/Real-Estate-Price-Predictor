@@ -50,7 +50,7 @@ property_type = st.sidebar.selectbox(
 )
 
 
-DISTRICTS_PATH = os.path.join(os.path.dirname(__file__), "..", "data","district_mapping.csv")
+DISTRICTS_PATH = os.path.join(os.path.dirname(__file__), "..","mapping.csv")
 def get_district_id(district_name: str) -> int:
     distric_mapping = {}
     
